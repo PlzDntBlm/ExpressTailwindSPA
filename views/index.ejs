@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Express Partials and Tailwind Example</title>
+    <link rel="stylesheet" href="/css/output.css"/>
+</head>
+<body class="bg-gray-100 p-4">
+
+<!-- Navigation / Tabs / etc. -->
+<nav>
+    <button data-target="/tab/home" class="bg-blue-500 text-white px-4 py-2">Home</button>
+    <button data-target="/tab/profile" class="bg-blue-500 text-white px-4 py-2">Profile</button>
+    <button data-target="/tab/settings" class="bg-blue-500 text-white px-4 py-2">Settings</button>
+</nav>
+
+<!-- Container where we inject partials -->
+<div id="tab-content" class="mt-4">
+    <%- include('partials/home') %>
+</div>
+
+<script>
+    const tabContentDiv = document.getElementById('tab-content');
+    const buttons = document.querySelectorAll('nav button');
+
+    // Reusable function to fetch and set content
+    async function fetchAndShowTab(url) {
+        try {
+            const response = await fetch(url);
+            const html = await response.text();
+            tabContentDiv.innerHTML = html;
+
+            // Save the chosen tab in localStorage
+            localStorage.setItem('activeTab', url);
+        } catch (err) {
+            console.error('Error fetching tab:', err);
+        }
+    }
+
+    // When user clicks a button, fetch that partial and inject
+    buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const targetUrl = btn.dataset.target;
+            fetchAndShowTab(targetUrl);
+        });
+    });
+
+    // On page load, check if there's a saved tab
+    // If so, load it instead of the default
+    window.addEventListener('DOMContentLoaded', () => {
+        const savedTab = localStorage.getItem('activeTab');
+        if (savedTab) {
+            fetchAndShowTab(savedTab);
+        }
+    });
+</script>
+</body>
+</html>

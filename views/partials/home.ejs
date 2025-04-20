@@ -1,4 +1,12 @@
 <div>
-    <h2>Welcome to Home</h2>
-    <p>This is the Home tab content</p>
+    <h2 class="text-xl font-semibold mb-2">Home Partial</h2>
+    <p>Welcome to the home section of <%= siteTitle %>.</p> <%# Accessing siteTitle %>
+
+    <% if (currentUser) { %> <%# Checking currentUser %>
+    <p class="mt-2 text-green-700">You are viewing this as <span class="font-medium"><%= currentUser.username %></span>.</p>
+    <% } else { %>
+        <p class="mt-2 text-gray-500">You are viewing this as a guest.</p>
+    <% } %>
+
+    <p class="mt-4">This content loaded via fetch, no full page reload.</p>
 </div>

@@ -1,13 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8" />
-    <title>Express SPA Demo - Auth Middleware</title>
+    <title><%= siteTitle %></title>
     <link href="/css/output.css" rel="stylesheet">
 </head>
 <body class="bg-gray-200">
 <div class="container mx-auto p-4">
-    <h1 class="text-2xl font-bold mb-4">Aristocrat Messenger (SPA Demo)</h1>
+    <h1 class="text-2xl font-bold mb-4"><%= siteTitle %></h1>
+
+    <div class="mb-2 text-sm text-gray-600">
+        <% if (currentUser) { %>
+            Welcome, <span class="font-semibold"><%= currentUser.username %></span>!
+        <% } else { %>
+            You are not logged in.
+        <% } %>
+    </div>
+
     <nav class="mb-4 space-x-2">
         <button
                 onclick="loadPartial('/partials/home')"
@@ -17,7 +26,7 @@
         </button>
         <button
                 onclick="loadPartial('/partials/profile')"
-                class="!bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
         >
             Profile (Protected)
         </button>
@@ -45,21 +54,32 @@
 
     async function loadPartial(url) {
         console.log(`Attempting to load partial: ${url}`);
-        contentDiv.innerHTML = '<p class="text-gray-500">Loading...</p>'; // Show loading indicator
+        contentDiv.innerHTML = '<p class="text-gray-500">Loading...</p>';
 
         try {
-            const res = await fetch(url);
+            // Pass current authentication state if known (needed for res.locals demo)
+            // This adds ?authenticated=true if the currentUser exists in the main page context
+            const separator = url.includes('?') ? '&' : '?';
+            const authParam = window.currentUserIsSet ? 'authenticated=true' : ''; // Check a flag set by EJS
+            const fetchUrl = authParam ? `${url}${separator}${authParam}` : url;
 
-            if (res.ok) { // Status 200-299
+            // --- We need a way for the client to know if it *thinks* it's authenticated
+            // Let's update this slightly. We'll manage a simple client state later.
+            // For now, let's rely on the buttons providing the ?authenticated=true
+
+            const res = await fetch(url); // Use the URL directly from the button click
+
+            if (res.ok) {
                 const html = await res.text();
                 contentDiv.innerHTML = html;
                 console.log(`Successfully loaded partial: ${url}`);
-            } else if (res.status === 401) { // Authentication required
+                // Update global state if needed (e.g., after successful login action)
+                // We can add this logic later when implementing login form submission.
+            } else if (res.status === 401) {
                 console.warn(`Authentication required for ${url}. Loading login partial.`);
-                // Automatically load the login partial instead
-                await loadPartial('/partials/login'); // Recursively call to load login
+                // Load login partial without the auth flag
+                await loadPartial('/partials/login');
             } else {
-                // Handle other errors (e.g., 404 Not Found, 500 Server Error)
                 contentDiv.innerHTML = `<p class="text-red-500">Error loading content: ${res.status} ${res.statusText}</p>`;
                 console.error(`Error loading partial ${url}:`, res.status, res.statusText);
             }
@@ -69,11 +89,14 @@
         }
     }
 
-    // Optional: Load initial partial on page load (e.g., home)
+    // Add this script block to set the initial state flag based on server render
+    // Note: This is a simple way; more robust state management might be needed later.
+    window.currentUserIsSet = <%- !!currentUser %>; // EJS renders true or false
+
+    // Optional: Load initial partial
     // document.addEventListener('DOMContentLoaded', () => {
     //   loadPartial('/partials/home');
     // });
-
 </script>
 </body>
 </html>

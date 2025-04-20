@@ -1,5 +1,12 @@
 <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4" role="alert">
     <h2 class="font-bold text-xl mb-2">User Profile</h2>
-    <p>This is your protected profile partial.</p>
-    <p>You accessed this because the authentication check passed (e.g., <code>?authenticated=true</code> was present in the fetch URL).</p>
+
+    <%# currentUser is guaranteed to exist here because of requireAuth middleware %>
+    <% if (currentUser) { %>
+        <p>Welcome, <span class="font-medium"><%= currentUser.username %></span>!</p>
+        <p>This is your protected profile partial within <%= siteTitle %>.</p>
+        <p>Authentication check passed.</p>
+    <% } else { %>
+        <p class="text-red-600">Error: Profile loaded but user data is missing.</p>
+    <% } %>
 </div>

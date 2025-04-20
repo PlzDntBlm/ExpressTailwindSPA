@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
-const requireAuth = require('./middleware/authMiddleware'); // Keep this
+const requireAuth = require('./middleware/authMiddleware');
+const localsMiddleware = require('./middleware/localsMiddleware');
 
 const app = express();
 const PORT = 3000;
@@ -11,6 +12,9 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
+
+// --- Global Middleware ---
+app.use(localsMiddleware);
 
 // --- Routes ---
 

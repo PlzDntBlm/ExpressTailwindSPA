@@ -4,13 +4,13 @@
     <div class="mt-2">
         <p>Simulate logging in by adding <code>?authenticated=true</code> to the URL when requesting a protected partial.</p>
         <button
-                onclick="loadPartial('/partials/home?authenticated=true')"
+                onclick="loadPartial('/home', '/partials/home?authenticated=true')"
                 class="mt-2 mr-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-sm"
         >
             Load Home (Simulated Login)
         </button>
         <button
-                onclick="loadPartial('/partials/profile?authenticated=true')"
+                onclick="loadPartial('/profile', '/partials/profile?authenticated=true')"
                 class="mt-2 bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-sm"
         >
             Load Profile (Simulated Login)

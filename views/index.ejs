@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <title><%= siteTitle %></title>
     <link href="/css/output.css" rel="stylesheet">
+    <style>
+        /* Basic transition */
+        #content { transition: opacity 0.3s ease-in-out; }
+        #content.loading { opacity: 0.5; }
+    </style>
 </head>
 <body class="bg-gray-200">
 <div class="container mx-auto p-4">
@@ -19,25 +24,25 @@
 
     <nav class="mb-4 space-x-2">
         <button
-                onclick="loadPartial('/partials/home')"
+                onclick="loadPartial('/home', '/partials/home')"
                 class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
         >
             Home
         </button>
         <button
-                onclick="loadPartial('/partials/profile')"
+                onclick="loadPartial('/profile', '/partials/profile')"
                 class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
         >
-            Profile (Protected)
+            Profile (Need Auth)
         </button>
         <button
-                onclick="loadPartial('/partials/profile?authenticated=true')"
+                onclick="loadPartial('/profile', '/partials/profile?authenticated=true')"
                 class="bg-teal-500 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded"
         >
             Profile (Simulate Auth)
         </button>
         <button
-                onclick="loadPartial('/partials/login')"
+                onclick="loadPartial('/login', '/partials/login')"
                 class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
         >
             Login View
@@ -45,58 +50,111 @@
     </nav>
 
     <div id="content" class="bg-white p-6 rounded shadow-md min-h-[200px]">
-        <p>Click a button above to load content.</p>
+        <p>Loading initial content...</p>
     </div>
 </div>
 
 <script>
     const contentDiv = document.getElementById('content');
+    // Client-side knowledge of the current user state (simplistic)
+    let clientIsAuthenticated = <%- !!currentUser %>; // Based on initial server render
+    const siteTitleBase = <%- JSON.stringify(siteTitle) %>; // Get base title safely
 
-    async function loadPartial(url) {
-        console.log(`Attempting to load partial: ${url}`);
+    // Map browser paths to the URLs used for fetching partials
+    const routeToPartialMap = {
+        '/': '/partials/home', // Default for root
+        '/home': '/partials/home',
+        '/profile': '/partials/profile',
+        '/login': '/partials/login'
+        // Add other routes here (e.g., '/map': '/partials/map')
+    };
+
+    async function loadPartial(browserUrl, fetchUrl, isPopState = false) {
+        console.log(`Requesting state: ${browserUrl}, Fetching: ${fetchUrl}, IsPopState: ${isPopState}`);
         contentDiv.innerHTML = '<p class="text-gray-500">Loading...</p>';
+        contentDiv.classList.add('loading');
 
         try {
-            // Pass current authentication state if known (needed for res.locals demo)
-            // This adds ?authenticated=true if the currentUser exists in the main page context
-            const separator = url.includes('?') ? '&' : '?';
-            const authParam = window.currentUserIsSet ? 'authenticated=true' : ''; // Check a flag set by EJS
-            const fetchUrl = authParam ? `${url}${separator}${authParam}` : url;
+            // Append simulated auth state if needed, EXCEPT for the login partial itself
+            let effectiveFetchUrl = fetchUrl;
+            if (!fetchUrl.startsWith('/partials/login') && fetchUrl.includes('/partials/profile') && clientIsAuthenticated) {
+                effectiveFetchUrl = fetchUrl.includes('?') ? `${fetchUrl}&authenticated=true` : `${fetchUrl}?authenticated=true`;
+                console.log(`Appending simulated auth state: ${effectiveFetchUrl}`);
+            } else if (!fetchUrl.startsWith('/partials/login') && fetchUrl.includes('/partials/profile') && !clientIsAuthenticated) {
+                // If trying to fetch profile without client thinking it's authed, don't add param
+                console.log(`Fetching profile without simulated auth state: ${effectiveFetchUrl}`);
+            }
 
-            // --- We need a way for the client to know if it *thinks* it's authenticated
-            // Let's update this slightly. We'll manage a simple client state later.
-            // For now, let's rely on the buttons providing the ?authenticated=true
 
-            const res = await fetch(url); // Use the URL directly from the button click
+            const res = await fetch(effectiveFetchUrl);
 
             if (res.ok) {
                 const html = await res.text();
                 contentDiv.innerHTML = html;
-                console.log(`Successfully loaded partial: ${url}`);
-                // Update global state if needed (e.g., after successful login action)
-                // We can add this logic later when implementing login form submission.
+                const pageTitle = `${siteTitleBase} - ${browserUrl.substring(1) || 'Home'}`; // Basic title generation
+                document.title = pageTitle;
+
+                // IMPORTANT: Update history ONLY if it wasn't a popstate event
+                if (!isPopState) {
+                    const state = { fetchUrl: fetchUrl, browserUrl: browserUrl };
+                    history.pushState(state, pageTitle, browserUrl);
+                    console.log('Pushed state:', state);
+                }
+                // Attempt to update client auth state based on URL (simplistic)
+                if (fetchUrl.includes('authenticated=true')) clientIsAuthenticated = true;
+                // Later, actual login/logout actions will update this reliably
+                console.log(`Successfully loaded partial for: ${browserUrl}`);
+
             } else if (res.status === 401) {
-                console.warn(`Authentication required for ${url}. Loading login partial.`);
-                // Load login partial without the auth flag
-                await loadPartial('/partials/login');
+                console.warn(`Authentication required for ${fetchUrl}. Loading login partial.`);
+                clientIsAuthenticated = false; // Update client state
+                // Load login partial, update history to show /login
+                await loadPartial('/login', '/partials/login', isPopState); // Pass popstate flag along
+
             } else {
                 contentDiv.innerHTML = `<p class="text-red-500">Error loading content: ${res.status} ${res.statusText}</p>`;
-                console.error(`Error loading partial ${url}:`, res.status, res.statusText);
+                console.error(`Error loading partial ${fetchUrl}:`, res.status, res.statusText);
+                document.title = `${siteTitleBase} - Error`;
             }
         } catch (err) {
             contentDiv.innerHTML = '<p class="text-red-500">Network error or server unavailable.</p>';
             console.error('Fetch error:', err);
+            document.title = `${siteTitleBase} - Network Error`;
+        } finally {
+            contentDiv.classList.remove('loading');
         }
     }
 
-    // Add this script block to set the initial state flag based on server render
-    // Note: This is a simple way; more robust state management might be needed later.
-    window.currentUserIsSet = <%- !!currentUser %>; // EJS renders true or false
+    // --- Event Listeners ---
 
-    // Optional: Load initial partial
-    // document.addEventListener('DOMContentLoaded', () => {
-    //   loadPartial('/partials/home');
-    // });
+    // Handle initial page load (and refreshes)
+    document.addEventListener('DOMContentLoaded', () => {
+        const initialPath = window.location.pathname;
+        const fetchUrl = routeToPartialMap[initialPath] || routeToPartialMap['/']; // Fallback to home
+        console.log(`Initial load path: ${initialPath}, mapped to fetch: ${fetchUrl}`);
+        // Load content without pushing state (it's already the current state)
+        loadPartial(initialPath, fetchUrl, true); // Treat initial load like popstate
+
+        // Initial state for popstate handler if user goes back to the very first page
+        const initialState = { fetchUrl: fetchUrl, browserUrl: initialPath };
+        history.replaceState(initialState, document.title, initialPath);
+        console.log('Replaced initial state:', initialState);
+    });
+
+    // Handle back/forward browser buttons
+    window.addEventListener('popstate', (event) => {
+        console.log('Popstate event fired. State:', event.state);
+        if (event.state && event.state.fetchUrl) {
+            // Load the content for the history state the user navigated to
+            loadPartial(event.state.browserUrl, event.state.fetchUrl, true); // Pass true for isPopState
+        } else {
+            // Handle cases where state is null (e.g., navigating back past the initial load?)
+            // Might load default /home or handle appropriately
+            console.log("Popstate event with null state, loading default.");
+            loadPartial('/home', '/partials/home', true);
+        }
+    });
+
 </script>
 </body>
 </html>

@@ -43,6 +43,16 @@ app.get('/partials/profile', requireAuth, (req, res) => {
 });
 
 
+// --- Catch-all Route for Client-Side Routing ---
+// This MUST be the LAST route definition
+app.get('*', (req, res) => {
+    console.log(`Catch-all route hit for path: ${req.path}. Serving index.ejs.`);
+    // Always render the main index file. Client-side JS will handle the rest.
+    // Ensure localsMiddleware runs before this to populate index.ejs correctly on direct load
+    res.render('index');
+});
+
+
 // Start server
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

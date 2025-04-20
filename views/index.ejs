@@ -1,77 +1,79 @@
 <!DOCTYPE html>
-<html lang="ens">
+<html lang="en">
 <head>
-    <title>Express Partials and Tailwind Example</title>
-    <link rel="stylesheet" href="/css/output.css"/>
+    <meta charset="UTF-8" />
+    <title>Express SPA Demo - Auth Middleware</title>
+    <link href="/css/output.css" rel="stylesheet">
 </head>
-<body>
-<nav>
-    <!-- Each link navigates to a path, but we’ll intercept it in JS -->
-    <a href="/home" data-link>Home</a>
-    <a href="/profile" data-link>Profile</a>
-    <a href="/settings" data-link>Settings</a>
-</nav>
+<body class="bg-gray-200">
+<div class="container mx-auto p-4">
+    <h1 class="text-2xl font-bold mb-4">Aristocrat Messenger (SPA Demo)</h1>
+    <nav class="mb-4 space-x-2">
+        <button
+                onclick="loadPartial('/partials/home')"
+                class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+            Home
+        </button>
+        <button
+                onclick="loadPartial('/partials/profile')"
+                class="!bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+        >
+            Profile (Protected)
+        </button>
+        <button
+                onclick="loadPartial('/partials/profile?authenticated=true')"
+                class="bg-teal-500 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded"
+        >
+            Profile (Simulate Auth)
+        </button>
+        <button
+                onclick="loadPartial('/partials/login')"
+                class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
+        >
+            Login View
+        </button>
+    </nav>
 
-<!-- Container where partial HTML is injected -->
-<div id="content">
-    <!-- Could show default "loading" or "home" content here if you like -->
+    <div id="content" class="bg-white p-6 rounded shadow-md min-h-[200px]">
+        <p>Click a button above to load content.</p>
+    </div>
 </div>
 
 <script>
-    // Map each "route path" to the partial endpoint & a title
-    const routes = {
-        '/': {partial: '/partials/home', title: 'Home'},
-        '/home': {partial: '/partials/home', title: 'Home'},
-        '/profile': {partial: '/partials/profile', title: 'Profile'},
-        '/settings': {partial: '/partials/settings', title: 'Settings'}
-    };
+    const contentDiv = document.getElementById('content');
 
-    // Loads content for a given path
-    async function loadRoute(path, pushState = false) {
-        // If the path isn’t recognized, fall back to '/'
-        if (!routes[path]) {
-            path = '/';
-        }
+    async function loadPartial(url) {
+        console.log(`Attempting to load partial: ${url}`);
+        contentDiv.innerHTML = '<p class="text-gray-500">Loading...</p>'; // Show loading indicator
 
         try {
-            const response = await fetch(routes[path].partial);
-            const html = await response.text();
+            const res = await fetch(url);
 
-            // Inject partial into #content
-            document.getElementById('content').innerHTML = html;
-
-            // Update the document title
-            document.title = routes[path].title;
-
-            // Push state if we’re navigating by click (not on first load or popstate)
-            if (pushState) {
-                window.history.pushState({path}, '', path);
+            if (res.ok) { // Status 200-299
+                const html = await res.text();
+                contentDiv.innerHTML = html;
+                console.log(`Successfully loaded partial: ${url}`);
+            } else if (res.status === 401) { // Authentication required
+                console.warn(`Authentication required for ${url}. Loading login partial.`);
+                // Automatically load the login partial instead
+                await loadPartial('/partials/login'); // Recursively call to load login
+            } else {
+                // Handle other errors (e.g., 404 Not Found, 500 Server Error)
+                contentDiv.innerHTML = `<p class="text-red-500">Error loading content: ${res.status} ${res.statusText}</p>`;
+                console.error(`Error loading partial ${url}:`, res.status, res.statusText);
             }
         } catch (err) {
-            console.error('Error loading route:', err);
+            contentDiv.innerHTML = '<p class="text-red-500">Network error or server unavailable.</p>';
+            console.error('Fetch error:', err);
         }
     }
 
-    // Intercept clicks on links with data-link
-    document.addEventListener('click', (e) => {
-        const link = e.target.closest('a[data-link]');
-        if (link) {
-            e.preventDefault();
-            const path = link.getAttribute('href');
-            loadRoute(path, true);
-        }
-    });
+    // Optional: Load initial partial on page load (e.g., home)
+    // document.addEventListener('DOMContentLoaded', () => {
+    //   loadPartial('/partials/home');
+    // });
 
-    // Handle back/forward in the browser
-    window.addEventListener('popstate', (e) => {
-        const path = e.state?.path || window.location.pathname;
-        loadRoute(path, false);
-    });
-
-    // On first load / page refresh, load the partial based on the current URL
-    document.addEventListener('DOMContentLoaded', () => {
-        loadRoute(window.location.pathname, false);
-    });
 </script>
 </body>
 </html>

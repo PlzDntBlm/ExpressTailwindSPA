@@ -1,35 +1,45 @@
-// app.js
 const express = require('express');
 const path = require('path');
+const requireAuth = require('./middleware/authMiddleware'); // Keep this
+
 const app = express();
 const PORT = 3000;
 
+// View engine setup
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// 1) Serve a single EJS for all main routes:
-//    e.g. /, /home, /profile, /settings
-app.get(['/', '/home', '/profile', '/settings'], (req, res) => {
-    // Always render the same index.ejs
+// Static files
+app.use(express.static(path.join(__dirname, 'public')));
+
+// --- Routes ---
+
+// Main page route - Serves the base HTML structure
+app.get('/', (req, res) => {
     res.render('index');
 });
 
-// 2) Routes to return *partials* only (for dynamic injection)
+// --- Partial Routes ---
+
+// Login partial route (NO auth required)
+app.get('/partials/login', (req, res) => {
+    res.render('partials/login');
+});
+
+// Home partial route (NO auth required for this example)
 app.get('/partials/home', (req, res) => {
     res.render('partials/home');
 });
 
-app.get('/partials/profile', (req, res) => {
+// Profile partial route (Auth REQUIRED)
+app.get('/partials/profile', requireAuth, (req, res) => {
+    // Middleware already checked auth. If we get here, user is authenticated.
+    // In a real app, fetch user data here if needed.
     res.render('partials/profile');
 });
 
-app.get('/partials/settings', (req, res) => {
-    res.render('partials/settings');
-});
 
-// 3) (Optional) Serve static assets from "public"
-app.use(express.static(path.join(__dirname, 'public')));
-
+// Start server
 app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
 });

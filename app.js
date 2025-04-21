@@ -1,7 +1,13 @@
+// app.js (Refactored for Router)
 const express = require('express');
 const path = require('path');
-const requireAuth = require('./middleware/authMiddleware');
+
+// Keep middleware requires
+const requireAuth = require('./middleware/authMiddleware'); // Used within router now
 const localsMiddleware = require('./middleware/localsMiddleware');
+
+// Require the new router
+const partialRoutes = require('./routes/partials'); // <-- Add this
 
 const app = express();
 const PORT = 3000;
@@ -10,48 +16,35 @@ const PORT = 3000;
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Static files
+// Static files (Ensure 'public' directory exists)
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Body Parsing Middleware (Keep if needed for future forms, remove if rolled back)
+// app.use(express.urlencoded({ extended: true }));
+// app.use(express.json());
+
+// Session Middleware (Remove if rolled back)
+// app.use(session({...}));
+
 // --- Global Middleware ---
-app.use(localsMiddleware);
+app.use(localsMiddleware); // Keep this
 
 // --- Routes ---
 
-// Main page route - Serves the base HTML structure
+// Main page route - Renders the SPA shell
 app.get('/', (req, res) => {
     res.render('index');
 });
 
-// --- Partial Routes ---
-
-// Login partial route (NO auth required)
-app.get('/partials/login', (req, res) => {
-    res.render('partials/login');
-});
-
-// Home partial route (NO auth required for this example)
-app.get('/partials/home', (req, res) => {
-    res.render('partials/home');
-});
-
-// Profile partial route (Auth REQUIRED)
-app.get('/partials/profile', requireAuth, (req, res) => {
-    // Middleware already checked auth. If we get here, user is authenticated.
-    // In a real app, fetch user data here if needed.
-    res.render('partials/profile');
-});
-
+// --- Mount Routers ---
+app.use('/partials', partialRoutes); // <-- Mount the partials router
 
 // --- Catch-all Route for Client-Side Routing ---
-// This MUST be the LAST route definition
+// Must be LAST
 app.get('*', (req, res) => {
     console.log(`Catch-all route hit for path: ${req.path}. Serving index.ejs.`);
-    // Always render the main index file. Client-side JS will handle the rest.
-    // Ensure localsMiddleware runs before this to populate index.ejs correctly on direct load
     res.render('index');
 });
-
 
 // Start server
 app.listen(PORT, () => {

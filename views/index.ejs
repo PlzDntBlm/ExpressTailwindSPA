@@ -2,11 +2,12 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <title><%= siteTitle %></title>
+    <title><%= siteTitle %></title> <%# Still uses locals %>
     <link href="/css/output.css" rel="stylesheet">
     <style>
         #content { transition: opacity 0.3s ease-in-out; }
         #content.loading { opacity: 0.5; }
+        #userStatus { min-height: 1.25rem; } /* Prevent layout shift */
     </style>
 </head>
 <body class="bg-gray-200">
@@ -14,45 +15,18 @@
     <h1 class="text-2xl font-bold mb-4"><%= siteTitle %></h1>
 
     <div id="userStatus" class="mb-2 text-sm text-gray-600">
-        <%# Initial rendering is still done by EJS %>
-        <% if (currentUser) { %>
-            Welcome, <span class="font-semibold"><%= currentUser.username %></span>!
+        <% if (currentUser) { %> <%# localsMiddleware still provides this based on simulation %>
+        Welcome, <span class="font-semibold"><%= currentUser.username %></span>!
         <% } else { %>
             You are not logged in.
         <% } %>
     </div>
 
     <nav class="mb-4 space-x-2">
-        <button
-                onclick="loadPartial('/home', '/partials/home')"
-                class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-        >
-            Home
-        </button>
-        <button
-                onclick="loadPartial('/profile', '/partials/profile')"
-                class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-        >
-            Profile (Need Auth)
-        </button>
-        <button
-                onclick="loadPartial('/profile', '/partials/profile?authenticated=true')"
-                class="bg-teal-500 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded"
-        >
-            Profile (Simulate Auth)
-        </button>
-        <button
-                onclick="loadPartial('/login', '/partials/login')"
-                class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
-        >
-            Login View
-        </button>
-        <button
-                onclick="simulateLogout()"
-                class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-        >
-            Simulate Logout
-        </button>
+        <button onclick="loadPartial('/home', '/partials/home')" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Home</button>
+        <button onclick="loadPartial('/profile', '/partials/profile')" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Profile</button> <%# Profile route still uses placeholder auth middleware %>
+        <button onclick="loadPartial('/login', '/partials/login')" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Login View</button>
+        <button onclick="loadPartial('/register', '/partials/register')" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">Register</button>
     </nav>
 
     <div id="content" class="bg-white p-6 rounded shadow-md min-h-[200px]">
@@ -62,88 +36,90 @@
 
 <script>
     const contentDiv = document.getElementById('content');
-    const userStatusDiv = document.getElementById('userStatus'); // Get the status div
-    let clientIsAuthenticated = <%- !!currentUser %>;
+    const userStatusDiv = document.getElementById('userStatus');
+    // Removed clientIsAuthenticated variable - will be handled by real auth later
     const siteTitleBase = <%- JSON.stringify(siteTitle) %>;
 
     const routeToPartialMap = {
         '/': '/partials/home',
         '/home': '/partials/home',
         '/profile': '/partials/profile',
-        '/login': '/partials/login'
+        '/login': '/partials/login',
+        '/register': '/partials/register' // Keep this if register partial exists
     };
 
-    // --- NEW: Function to update the user status display ---
-    function updateUserStatusDisplay() {
-        if (!userStatusDiv) return;
-
-        if (clientIsAuthenticated) {
-            // For simulation, use a fixed username when authenticated client-side
-            const username = 'DemoUser';
-            userStatusDiv.innerHTML = `Welcome, <span class="font-semibold">${username}</span>!`;
-        } else {
-            userStatusDiv.innerHTML = 'You are not logged in.';
+    // --- Function to dynamically load and execute JS ---
+    async function loadAndExecuteScript(scriptPath) {
+        try {
+            const response = await fetch(scriptPath);
+            if (response.ok) {
+                const scriptContent = await response.text();
+                const scriptElement = document.createElement('script');
+                scriptElement.textContent = scriptContent;
+                // Append, execute, then remove
+                document.body.appendChild(scriptElement);
+                document.body.removeChild(scriptElement);
+                console.log(`Successfully loaded and executed script: ${scriptPath}`);
+            } else if (response.status === 404) {
+                console.log(`No associated script found for partial at: ${scriptPath}`);
+                // This is expected for partials without JS, so no error needed
+            } else {
+                console.error(`Error fetching script ${scriptPath}: ${response.status} ${response.statusText}`);
+            }
+        } catch (err) {
+            console.error(`Network error loading script ${scriptPath}:`, err);
         }
-        console.log(`Updated user status display. clientIsAuthenticated: ${clientIsAuthenticated}`);
     }
-    // --- End NEW function ---
+    // --- End new function ---
+
 
     async function loadPartial(browserUrl, fetchUrl, isPopState = false) {
         console.log(`Requesting state: ${browserUrl}, Fetching: ${fetchUrl}, IsPopState: ${isPopState}`);
         contentDiv.innerHTML = '<p class="text-gray-500">Loading...</p>';
         contentDiv.classList.add('loading');
 
-        // Determine the fetch URL based on client state for profile route
-        let effectiveFetchUrl = fetchUrl;
-        if (fetchUrl.startsWith('/partials/profile')) {
-            effectiveFetchUrl = clientIsAuthenticated
-                ? (fetchUrl.includes('?') ? `${fetchUrl}&authenticated=true` : `${fetchUrl}?authenticated=true`)
-                : fetchUrl.replace(/\?authenticated=true|&authenticated=true/, ''); // Remove auth param if not authed
-            console.log(`Adjusted fetch URL based on client auth state: ${effectiveFetchUrl}`);
-        }
-
+        // TODO: Clean up placeholder auth logic if still present in middleware requires it
+        // For now, assume placeholder auth checks query params if needed by middleware
+        const effectiveFetchUrl = fetchUrl; // No client-side auth state modification
 
         try {
-            const res = await fetch(effectiveFetchUrl);
+            const res = await fetch(effectiveFetchUrl); // Fetch the HTML partial
 
             if (res.ok) {
                 const html = await res.text();
-                contentDiv.innerHTML = html;
+                contentDiv.innerHTML = html; // Inject HTML first
+                console.log(`Successfully loaded partial HTML: ${fetchUrl}`);
+
+                // --- NEW: Attempt to load corresponding JS ---
+                // Convention: /partials/foo -> /js/partials/foo.js
+                const partialName = fetchUrl.substring(fetchUrl.lastIndexOf('/') + 1);
+                if (partialName) { // Ensure we have a name
+                    const scriptPath = `/js/partials/${partialName}.js`;
+                    await loadAndExecuteScript(scriptPath); // Load JS after HTML is in DOM
+                }
+                // --- End NEW ---
+
+
                 const pageTitle = `${siteTitleBase} - ${browserUrl.substring(1) || 'Home'}`;
                 document.title = pageTitle;
-
-                // Detect if this successful load implies authentication
-                // More robust check: ideally the server confirms auth status in response
-                if (fetchUrl.includes('authenticated=true') || browserUrl === '/profile') {
-                    // If we successfully loaded profile, or simulated login, set client auth state
-                    if (!clientIsAuthenticated) { // Only update if state changed
-                        clientIsAuthenticated = true;
-                        updateUserStatusDisplay(); // <-- Update display on auth success
-                    }
-                }
 
                 if (!isPopState) {
                     const state = { fetchUrl: fetchUrl, browserUrl: browserUrl };
                     history.pushState(state, pageTitle, browserUrl);
                     console.log('Pushed state:', state);
                 }
-                console.log(`Successfully loaded partial for: ${browserUrl}`);
+                // Removed clientIsAuthenticated update logic
 
-            } else if (res.status === 401) {
+            } else if (res.status === 401) { // Auth middleware check failed
                 console.warn(`Authentication required for ${effectiveFetchUrl}. Loading login partial.`);
-                if (clientIsAuthenticated) { // Only update if state changed
-                    clientIsAuthenticated = false;
-                    updateUserStatusDisplay(); // <-- Update display on auth failure (401)
-                }
-                await loadPartial('/login', '/partials/login', isPopState);
+                // No clientIsAuthenticated to update now
+                // updateUserStatusDisplay(); // Status display doesn't update dynamically now
+                await loadPartial('/login', '/partials/login', isPopState); // Load login view
 
-            } else {
-                // Handle other errors
+            } else { // Other errors (404, 500 etc)
                 contentDiv.innerHTML = `<p class="text-red-500">Error loading content: ${res.status} ${res.statusText}</p>`;
                 console.error(`Error loading partial ${effectiveFetchUrl}:`, res.status, res.statusText);
                 document.title = `${siteTitleBase} - Error`;
-                // Should we reset auth state on other errors? Maybe not.
-                // updateUserStatusDisplay(); // Update display to reflect current clientIsAuthenticated
             }
         } catch (err) {
             contentDiv.innerHTML = '<p class="text-red-500">Network error or server unavailable.</p>';
@@ -154,29 +130,16 @@
         }
     }
 
-    // --- NEW: Function for simulated logout ---
-    function simulateLogout() {
-        if (clientIsAuthenticated) {
-            clientIsAuthenticated = false;
-            updateUserStatusDisplay(); // Update display
-            console.log('Simulated logout.');
-            // Optionally navigate to home or login page
-            loadPartial('/home', '/partials/home');
-        }
-    }
+    // Event Listeners (DOMContentLoaded, popstate) remain largely the same
+    // The 'submit' event listener from Iteration 6 should be removed as
+    // the logic will live in the specific partial JS files now.
 
-    // --- Event Listeners ---
     document.addEventListener('DOMContentLoaded', () => {
         const initialPath = window.location.pathname;
         const fetchUrl = routeToPartialMap[initialPath] || routeToPartialMap['/'];
         console.log(`Initial load path: ${initialPath}, mapped to fetch: ${fetchUrl}`);
-
-        // Set initial client state based on server render
-        clientIsAuthenticated = <%- !!currentUser %>;
-        updateUserStatusDisplay(); // <-- Call initially to set JS-controlled display
-
+        // updateUserStatusDisplay(); // No dynamic update for now
         loadPartial(initialPath, fetchUrl, true);
-
         const initialState = { fetchUrl: fetchUrl, browserUrl: initialPath };
         history.replaceState(initialState, document.title, initialPath);
         console.log('Replaced initial state:', initialState);
@@ -185,21 +148,11 @@
     window.addEventListener('popstate', (event) => {
         console.log('Popstate event fired. State:', event.state);
         if (event.state && event.state.fetchUrl) {
-            // Determine auth state based on the URL we are going back/forward TO
-            if (event.state.browserUrl === '/profile' && !event.state.fetchUrl.includes('authenticated=true')) {
-                // This state represents an attempt to load profile without auth
-                clientIsAuthenticated = false;
-            } else if (event.state.fetchUrl.includes('authenticated=true')) {
-                // This state represents an authenticated view
-                clientIsAuthenticated = true;
-            }
-            // Update display based on the state we are navigating to
-            updateUserStatusDisplay();
+            // updateUserStatusDisplay(); // No dynamic update for now
             loadPartial(event.state.browserUrl, event.state.fetchUrl, true);
         } else {
             console.log("Popstate event with null/invalid state, loading default.");
-            clientIsAuthenticated = false; // Assume logged out for root/unknown state
-            updateUserStatusDisplay();
+            // updateUserStatusDisplay(); // No dynamic update for now
             loadPartial('/home', '/partials/home', true);
         }
     });

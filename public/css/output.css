@@ -455,6 +455,9 @@
   .max-h-screen {
     max-height: 100vh;
   }
+  .min-h-\[1\.25rem\] {
+    min-height: 1.25rem;
+  }
   .min-h-\[200px\] {
     min-height: 200px;
   }
